@@ -13,14 +13,13 @@
     --text: #1f2933;
     --green: #16a34a;
     --red: #dc2626;
+    --accent: #2563eb;
 }
-
 body.dark {
     --bg: #0f172a;
     --card: #1e293b;
     --text: #e5e7eb;
 }
-
 body {
     margin: 0;
     font-family: Arial, sans-serif;
@@ -28,19 +27,16 @@ body {
     color: var(--text);
     direction: rtl;
     text-align: center;
+    transition: background 0.3s, color 0.3s;
 }
-
 header {
-    background: linear-gradient(135deg,#2563eb,#1e40af);
+    background: linear-gradient(135deg,var(--accent),#1e40af);
     color: white;
     padding: 20px;
-    font-size: 22px;
+    font-size: 24px;
+    font-weight: bold;
 }
-
-.container {
-    padding: 20px;
-}
-
+.container { padding: 20px; }
 .controls {
     display: flex;
     justify-content: center;
@@ -48,62 +44,206 @@ header {
     margin-bottom: 15px;
     flex-wrap: wrap;
 }
-
 button {
     border: none;
-    padding: 10px 14px;
-    border-radius: 10px;
+    padding: 10px 16px;
+    border-radius: 12px;
     font-size: 14px;
     cursor: pointer;
+    transition: transform 0.2s;
 }
-
+button:hover { transform: scale(1.05); }
 .refresh { background: #22c55e; color: white; }
 .darkmode { background: #334155; color: white; }
 .convert { background: #f59e0b; color: white; }
 
 .card {
     background: var(--card);
-    max-width: 380px;
+    max-width: 400px;
     margin: 15px auto;
     padding: 20px;
     border-radius: 16px;
-    box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+    box-shadow: 0 12px 24px rgba(0,0,0,0.15);
+    transition: transform 0.2s;
 }
-
-.title {
-    font-size: 17px;
-    margin-bottom: 10px;
-}
-
-.price {
-    font-size: 26px;
-    font-weight: bold;
-}
-
+.card:hover { transform: translateY(-5px); }
+.title { font-size: 17px; margin-bottom: 10px; font-weight: bold; }
+.price { font-size: 26px; font-weight: bold; transition: color 0.3s; }
 .up { color: var(--green); }
 .down { color: var(--red); }
+.update { margin-top: 15px; font-size: 13px; opacity: 0.8; }
 
-.update {
-    margin-top: 15px;
-    font-size: 13px;
-    opacity: 0.8;
-}
+input, select { padding:8px; margin:5px; border-radius:8px; border:1px solid #ccc; font-size:14px; }
+canvas { max-width:100%; margin:15px auto; }
+footer { font-size:12px; padding:15px; opacity:0.7; text-align:center; }
 
-footer {
-    font-size: 12px;
-    padding: 15px;
-    opacity: 0.7;
+/* قسم الأخبار */
+.news-section {
+    max-width: 800px;
+    margin: 30px auto;
+    text-align: right;
 }
-
-input, select {
-    padding: 8px;
-    margin: 5px;
-    border-radius: 8px;
-    border: 1px solid #ccc;
-    font-size: 14px;
+.news-section h3 { margin-bottom: 10px; font-size: 18px; color: var(--accent); }
+.news-item {
+    background: var(--card);
+    padding: 12px 15px;
+    border-radius: 12px;
+    margin-bottom: 10px;
+    box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+    transition: transform 0.2s;
 }
-canvas { max-width: 100%; margin: 15px auto; }
+.news-item:hover { transform: translateX(5px); }
+.news-item a { text-decoration: none; color: var(--text); font-weight: bold; }
+.news-item a:hover { color: var(--accent); }
 </style>
+</head>
+<body>
+
+<header>💱 أسعار العملات مقابل الليرة السورية</header>
+
+<div class="container">
+
+<div class="controls">
+    <button class="refresh" onclick="fetchRates()">🔄 تحديث</button>
+    <button class="darkmode" onclick="toggleDark()">🌙 وضع ليلي</button>
+</div>
+
+<!-- أسعار العملات -->
+<div id="currencies"></div>
+
+<div class="update" id="last_update"></div>
+
+<!-- محول العملات -->
+<div class="card">
+    <div class="title">💱 محول العملات</div>
+    <input type="number" id="amount" placeholder="المبلغ" value="1">
+    <select id="from_currency"></select>
+    <select id="to_currency"></select>
+    <button class="convert" onclick="convertCurrency()">تحويل 🔄</button>
+    <div id="conversion_result"></div>
+</div>
+
+<!-- الرسم البياني -->
+<div class="card">
+    <div class="title">📊 سعر الدولار خلال آخر 24 ساعة</div>
+    <canvas id="usd_chart"></canvas>
+</div>
+
+<!-- قسم الأخبار -->
+<div class="news-section">
+    <h3>📰 آخر الأخبار الاقتصادية</h3>
+    <div class="news-item"><a href="https://syrianews.com/news1" target="_blank">ارتفاع أسعار الدولار اليوم في السوق السوداء</a></div>
+    <div class="news-item"><a href="https://syrianews.com/news2" target="_blank">مصرف سوريا المركزي يحدد سعر الصرف الرسمي</a></div>
+    <div class="news-item"><a href="https://syrianews.com/news3" target="_blank">تحليل اقتصادي حول الليرة السورية</a></div>
+</div>
+
+</div>
+
+<footer>الأسعار تقريبية – لأغراض معلوماتية فقط</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+let lastRates = {};
+let usdHistory = [];
+
+// العملات التي نريد عرضها
+const currenciesList = ["USD","EUR","SAR","EGP","TRY"];
+const currencyNames = {
+    "USD":"الدولار 🇺🇸",
+    "EUR":"اليورو 🇪🇺",
+    "SAR":"الريال السعودي 🇸🇦",
+    "EGP":"الجنيه المصري 🇪🇬",
+    "TRY":"الليرة التركية 🇹🇷"
+};
+
+// وضع ليلي
+function toggleDark() {
+    document.body.classList.toggle("dark");
+    localStorage.setItem("darkmode", document.body.classList.contains("dark"));
+}
+if(localStorage.getItem("darkmode")==="true") document.body.classList.add("dark");
+
+// إنشاء قائمة العملات في المحول
+const fromSelect = document.getElementById("from_currency");
+const toSelect = document.getElementById("to_currency");
+currenciesList.forEach(c => {
+    const option1 = document.createElement("option");
+    option1.value = c; option1.innerText = currencyNames[c];
+    fromSelect.appendChild(option1);
+    const option2 = document.createElement("option");
+    option2.value = c; option2.innerText = currencyNames[c];
+    toSelect.appendChild(option2);
+});
+
+// جلب الأسعار
+async function fetchRates(){
+    try {
+        const res = await fetch("https://open.er-api.com/v6/latest/USD");
+        const data = await res.json();
+        const sypUsd = data.rates.SYP;
+
+        const container = document.getElementById("currencies");
+        container.innerHTML = "";
+
+        currenciesList.forEach(c => {
+            let price;
+            if(c==="USD") price = sypUsd;
+            else price = sypUsd / data.rates[c];
+
+            const card = document.createElement("div");
+            card.className="card";
+            card.innerHTML=`<div class="title">${currencyNames[c]} → 🇸🇾 الليرة السورية</div>
+            <div class="price" id="${c}_syp">${price.toLocaleString(undefined,{maximumFractionDigits:2})} ل.س</div>`;
+            container.appendChild(card);
+            if(lastRates[c]){
+                const el = document.getElementById(`${c}_syp`);
+                if(price>lastRates[c]) el.classList.add("up"); 
+                if(price<lastRates[c]) el.classList.add("down");
+            }
+            lastRates[c] = price;
+        });
+
+        document.getElementById("last_update").innerText="⏱️ آخر تحديث: "+new Date().toLocaleTimeString();
+
+        usdHistory.push({time:new Date().toLocaleTimeString(), value:sypUsd});
+        if(usdHistory.length>24) usdHistory.shift();
+        drawChart();
+
+    } catch {
+        console.log("خطأ في جلب البيانات");
+    }
+}
+
+fetchRates();
+setInterval(fetchRates,60000);
+
+// محول العملات
+function convertCurrency(){
+    const amount=parseFloat(document.getElementById("amount").value);
+    const from=fromSelect.value;
+    const to=toSelect.value;
+
+    let syp=amount;
+    if(from!=="SYP") syp=amount*lastRates[from];
+    let result = (to==="SYP")? syp : syp/lastRates[to];
+
+    document.getElementById("conversion_result").innerText=`${amount} ${currencyNames[from]} = ${result.toLocaleString(undefined,{maximumFractionDigits:2})} ${currencyNames[to]}`;
+}
+
+// رسم بياني
+function drawChart(){
+    const ctx=document.getElementById('usd_chart').getContext('2d');
+    if(window.usdChart) window.usdChart.destroy();
+    window.usdChart=new Chart(ctx,{
+        type:'line',
+        data:{labels:usdHistory.map(e=>e.time), datasets:[{label:'USD → SYP', data:usdHistory.map(e=>e.value), borderColor:'#2563eb', backgroundColor:'rgba(37,99,235,0.2)', tension:0.3}]},
+        options:{responsive:true, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:false}}}
+    });
+}
+</script>
+
+</body>
+</html></style>
 </head>
 <body>
 
