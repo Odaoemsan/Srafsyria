@@ -1,425 +1,1414 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
-<meta charset="UTF-8">
-<title>سعر صرف الليرة السورية</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="manifest" href="manifest.json">
-
-<style>
-:root {
-    --bg: #f2f4f7;
-    --card: #ffffff;
-    --text: #1f2933;
-    --green: #16a34a;
-    --red: #dc2626;
-    --accent: #2563eb;
-}
-body.dark {
-    --bg: #0f172a;
-    --card: #1e293b;
-    --text: #e5e7eb;
-}
-body {
-    margin: 0;
-    font-family: Arial, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    direction: rtl;
-    text-align: center;
-    transition: background 0.3s, color 0.3s;
-}
-header {
-    background: linear-gradient(135deg,var(--accent),#1e40af);
-    color: white;
-    padding: 20px;
-    font-size: 24px;
-    font-weight: bold;
-}
-.container { padding: 20px; }
-.controls {
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-    margin-bottom: 15px;
-    flex-wrap: wrap;
-}
-button {
-    border: none;
-    padding: 10px 16px;
-    border-radius: 12px;
-    font-size: 14px;
-    cursor: pointer;
-    transition: transform 0.2s;
-}
-button:hover { transform: scale(1.05); }
-.refresh { background: #22c55e; color: white; }
-.darkmode { background: #334155; color: white; }
-.convert { background: #f59e0b; color: white; }
-
-.card {
-    background: var(--card);
-    max-width: 400px;
-    margin: 15px auto;
-    padding: 20px;
-    border-radius: 16px;
-    box-shadow: 0 12px 24px rgba(0,0,0,0.15);
-    transition: transform 0.2s;
-}
-.card:hover { transform: translateY(-5px); }
-.title { font-size: 17px; margin-bottom: 10px; font-weight: bold; }
-.price { font-size: 26px; font-weight: bold; transition: color 0.3s; }
-.up { color: var(--green); }
-.down { color: var(--red); }
-.update { margin-top: 15px; font-size: 13px; opacity: 0.8; }
-
-input, select { padding:8px; margin:5px; border-radius:8px; border:1px solid #ccc; font-size:14px; }
-canvas { max-width:100%; margin:15px auto; }
-footer { font-size:12px; padding:15px; opacity:0.7; text-align:center; }
-
-/* قسم الأخبار */
-.news-section {
-    max-width: 800px;
-    margin: 30px auto;
-    text-align: right;
-}
-.news-section h3 { margin-bottom: 10px; font-size: 18px; color: var(--accent); }
-.news-item {
-    background: var(--card);
-    padding: 12px 15px;
-    border-radius: 12px;
-    margin-bottom: 10px;
-    box-shadow: 0 6px 12px rgba(0,0,0,0.1);
-    transition: transform 0.2s;
-}
-.news-item:hover { transform: translateX(5px); }
-.news-item a { text-decoration: none; color: var(--text); font-weight: bold; }
-.news-item a:hover { color: var(--accent); }
-</style>
-</head>
-<body>
-
-<header>💱 أسعار العملات مقابل الليرة السورية</header>
-
-<div class="container">
-
-<div class="controls">
-    <button class="refresh" onclick="fetchRates()">🔄 تحديث</button>
-    <button class="darkmode" onclick="toggleDark()">🌙 وضع ليلي</button>
-</div>
-
-<!-- أسعار العملات -->
-<div id="currencies"></div>
-
-<div class="update" id="last_update"></div>
-
-<!-- محول العملات -->
-<div class="card">
-    <div class="title">💱 محول العملات</div>
-    <input type="number" id="amount" placeholder="المبلغ" value="1">
-    <select id="from_currency"></select>
-    <select id="to_currency"></select>
-    <button class="convert" onclick="convertCurrency()">تحويل 🔄</button>
-    <div id="conversion_result"></div>
-</div>
-
-<!-- الرسم البياني -->
-<div class="card">
-    <div class="title">📊 سعر الدولار خلال آخر 24 ساعة</div>
-    <canvas id="usd_chart"></canvas>
-</div>
-
-<!-- قسم الأخبار -->
-<div class="news-section">
-    <h3>📰 آخر الأخبار الاقتصادية</h3>
-    <div class="news-item"><a href="https://syrianews.com/news1" target="_blank">ارتفاع أسعار الدولار اليوم في السوق السوداء</a></div>
-    <div class="news-item"><a href="https://syrianews.com/news2" target="_blank">مصرف سوريا المركزي يحدد سعر الصرف الرسمي</a></div>
-    <div class="news-item"><a href="https://syrianews.com/news3" target="_blank">تحليل اقتصادي حول الليرة السورية</a></div>
-</div>
-
-</div>
-
-<footer>الأسعار تقريبية – لأغراض معلوماتية فقط</footer>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-let lastRates = {};
-let usdHistory = [];
-
-// العملات التي نريد عرضها
-const currenciesList = ["USD","EUR","SAR","EGP","TRY"];
-const currencyNames = {
-    "USD":"الدولار 🇺🇸",
-    "EUR":"اليورو 🇪🇺",
-    "SAR":"الريال السعودي 🇸🇦",
-    "EGP":"الجنيه المصري 🇪🇬",
-    "TRY":"الليرة التركية 🇹🇷"
-};
-
-// وضع ليلي
-function toggleDark() {
-    document.body.classList.toggle("dark");
-    localStorage.setItem("darkmode", document.body.classList.contains("dark"));
-}
-if(localStorage.getItem("darkmode")==="true") document.body.classList.add("dark");
-
-// إنشاء قائمة العملات في المحول
-const fromSelect = document.getElementById("from_currency");
-const toSelect = document.getElementById("to_currency");
-currenciesList.forEach(c => {
-    const option1 = document.createElement("option");
-    option1.value = c; option1.innerText = currencyNames[c];
-    fromSelect.appendChild(option1);
-    const option2 = document.createElement("option");
-    option2.value = c; option2.innerText = currencyNames[c];
-    toSelect.appendChild(option2);
-});
-
-// جلب الأسعار
-async function fetchRates(){
-    try {
-        const res = await fetch("https://open.er-api.com/v6/latest/USD");
-        const data = await res.json();
-        const sypUsd = data.rates.SYP;
-
-        const container = document.getElementById("currencies");
-        container.innerHTML = "";
-
-        currenciesList.forEach(c => {
-            let price;
-            if(c==="USD") price = sypUsd;
-            else price = sypUsd / data.rates[c];
-
-            const card = document.createElement("div");
-            card.className="card";
-            card.innerHTML=`<div class="title">${currencyNames[c]} → 🇸🇾 الليرة السورية</div>
-            <div class="price" id="${c}_syp">${price.toLocaleString(undefined,{maximumFractionDigits:2})} ل.س</div>`;
-            container.appendChild(card);
-            if(lastRates[c]){
-                const el = document.getElementById(`${c}_syp`);
-                if(price>lastRates[c]) el.classList.add("up"); 
-                if(price<lastRates[c]) el.classList.add("down");
-            }
-            lastRates[c] = price;
-        });
-
-        document.getElementById("last_update").innerText="⏱️ آخر تحديث: "+new Date().toLocaleTimeString();
-
-        usdHistory.push({time:new Date().toLocaleTimeString(), value:sypUsd});
-        if(usdHistory.length>24) usdHistory.shift();
-        drawChart();
-
-    } catch {
-        console.log("خطأ في جلب البيانات");
-    }
-}
-
-fetchRates();
-setInterval(fetchRates,60000);
-
-// محول العملات
-function convertCurrency(){
-    const amount=parseFloat(document.getElementById("amount").value);
-    const from=fromSelect.value;
-    const to=toSelect.value;
-
-    let syp=amount;
-    if(from!=="SYP") syp=amount*lastRates[from];
-    let result = (to==="SYP")? syp : syp/lastRates[to];
-
-    document.getElementById("conversion_result").innerText=`${amount} ${currencyNames[from]} = ${result.toLocaleString(undefined,{maximumFractionDigits:2})} ${currencyNames[to]}`;
-}
-
-// رسم بياني
-function drawChart(){
-    const ctx=document.getElementById('usd_chart').getContext('2d');
-    if(window.usdChart) window.usdChart.destroy();
-    window.usdChart=new Chart(ctx,{
-        type:'line',
-        data:{labels:usdHistory.map(e=>e.time), datasets:[{label:'USD → SYP', data:usdHistory.map(e=>e.value), borderColor:'#2563eb', backgroundColor:'rgba(37,99,235,0.2)', tension:0.3}]},
-        options:{responsive:true, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:false}}}
-    });
-}
-</script>
-
-</body>
-</html></style>
-</head>
-<body>
-
-<header>💱 سعر صرف الليرة السورية</header>
-
-<div class="container">
-
-<div class="controls">
-    <button class="refresh" onclick="fetchRates()">🔄 تحديث</button>
-    <button class="darkmode" onclick="toggleDark()">🌙 وضع ليلي</button>
-</div>
-
-<!-- أسعار العملات -->
-<div class="card">
-    <div class="title">🇺🇸 الدولار → 🇸🇾 الليرة السورية</div>
-    <div class="price" id="usd_syp">جاري التحميل...</div>
-</div>
-
-<div class="card">
-    <div class="title">🇹🇷 الليرة التركية → 🇸🇾 الليرة السورية</div>
-    <div class="price" id="try_syp">جاري التحميل...</div>
-</div>
-
-<div class="update" id="last_update"></div>
-
-<!-- محول العملات -->
-<div class="card">
-    <div class="title">💱 محول العملات</div>
-    <input type="number" id="amount" placeholder="المبلغ" value="1">
-    <select id="from_currency">
-        <option value="USD">الدولار 🇺🇸</option>
-        <option value="TRY">الليرة التركية 🇹🇷</option>
-        <option value="SYP">الليرة السورية 🇸🇾</option>
-    </select>
-    <select id="to_currency">
-        <option value="USD">الدولار 🇺🇸</option>
-        <option value="TRY">الليرة التركية 🇹🇷</option>
-        <option value="SYP">الليرة السورية 🇸🇾</option>
-    </select>
-    <button class="convert" onclick="convertCurrency()">تحويل 🔄</button>
-    <div id="conversion_result"></div>
-</div>
-
-<!-- الرسم البياني -->
-<div class="card">
-    <div class="title">📊 سعر الدولار خلال آخر 24 ساعة</div>
-    <canvas id="usd_chart"></canvas>
-</div>
-
-</div>
-
-<footer>
-الأسعار تقريبية – لأغراض معلوماتية فقط
-</footer>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-let lastUsd = null;
-let lastTry = null;
-let usdHistory = [];
-
-// وضع ليلي
-function toggleDark() {
-    document.body.classList.toggle("dark");
-    localStorage.setItem("darkmode", document.body.classList.contains("dark"));
-}
-if (localStorage.getItem("darkmode") === "true") document.body.classList.add("dark");
-
-// جلب الأسعار
-async function fetchRates() {
-    try {
-        const res = await fetch("https://open.er-api.com/v6/latest/USD");
-        const data = await res.json();
-
-        const usd = data.rates.SYP;
-        const tryRate = data.rates.TRY;
-        const trySyp = usd / tryRate;
-
-        setPrice("usd_syp", usd, lastUsd);
-        setPrice("try_syp", trySyp, lastTry);
-
-        // تحديث التاريخ
-        document.getElementById("last_update").innerText =
-            "⏱️ آخر تحديث: " + new Date().toLocaleTimeString();
-
-        // سجل للتاريخ
-        usdHistory.push({time: new Date().toLocaleTimeString(), value: usd});
-        if (usdHistory.length > 24) usdHistory.shift(); // آخر 24 ساعة
-        drawChart();
-
-        // إشعار عند تغير السعر
-        notifyChange(usd, lastUsd);
-
-        lastUsd = usd;
-        lastTry = trySyp;
-
-    } catch {
-        document.getElementById("usd_syp").innerText = "خطأ في جلب البيانات";
-        document.getElementById("try_syp").innerText = "خطأ في جلب البيانات";
-    }
-}
-
-// تحديث الأسعار كل دقيقة
-fetchRates();
-setInterval(fetchRates, 60000);
-
-// ضبط الأسعار مع الأسهم
-function setPrice(id, value, last) {
-    const el = document.getElementById(id);
-    let cls = "", arrow = "";
-    if (last !== null) {
-        if (value > last) { cls = "up"; arrow = " ⬆️"; }
-        if (value < last) { cls = "down"; arrow = " ⬇️"; }
-    }
-    el.className = "price " + cls;
-    el.innerText = value.toLocaleString(undefined,{maximumFractionDigits:2}) + " ل.س" + arrow;
-}
-
-// محول العملات
-function convertCurrency() {
-    const amount = parseFloat(document.getElementById("amount").value);
-    const from = document.getElementById("from_currency").value;
-    const to = document.getElementById("to_currency").value;
-
-    let usd = lastUsd, trySypRate = lastTry;
-    let result = amount;
-
-    if (from === "USD") result = amount * usd;
-    if (from === "TRY") result = amount * trySypRate;
-    if (from === "SYP") result = amount;
-
-    if (to === "USD") result = (from==="USD"? amount : result / usd);
-    if (to === "TRY") result = (from==="TRY"? amount : result / trySypRate);
-    if (to === "SYP") result = result;
-
-    document.getElementById("conversion_result").innerText =
-        `${amount} ${from} = ${result.toLocaleString(undefined,{maximumFractionDigits:2})} ${to}`;
-}
-
-// رسم بياني
-function drawChart() {
-    const ctx = document.getElementById('usd_chart').getContext('2d');
-    if(window.usdChart) window.usdChart.destroy();
-    window.usdChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: usdHistory.map(e => e.time),
-            datasets: [{
-                label: 'USD → SYP',
-                data: usdHistory.map(e => e.value),
-                borderColor: '#2563eb',
-                backgroundColor: 'rgba(37,99,235,0.2)',
-                tension: 0.3
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: false } }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>سوق الصرف السوري | أسعار العملات وتحويل الأموال</title>
+    <meta name="description" content="أدق أسعار صرف الليرة السورية، تحويل العملات، أخبار السوق، وأفضل الصرافين في سوريا">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🇸🇾</text></svg>">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700&family=Tajawal:wght@300;400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1e40af;
+            --secondary: #f59e0b;
+            --success: #16a34a;
+            --danger: #dc2626;
+            --warning: #f97316;
+            --light: #f8fafc;
+            --dark: #0f172a;
+            --gray: #64748b;
+            --card-bg: #ffffff;
+            --body-bg: #f1f5f9;
+            --border: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --radius: 12px;
+            --radius-lg: 16px;
+            --transition: all 0.3s ease;
         }
-    });
-}
 
-// إشعار تغير السعر
-function notifyChange(current, last) {
-    if (!("Notification" in window)) return;
-    if (last === null || current === last) return;
-    if (Notification.permission === "granted") {
-        new Notification("سعر الدولار تغير!", {
-            body: `السعر الجديد: ${current.toLocaleString(undefined,{maximumFractionDigits:2})} ل.س`
+        [data-theme="dark"] {
+            --primary: #3b82f6;
+            --primary-dark: #1d4ed8;
+            --secondary: #fbbf24;
+            --light: #1e293b;
+            --dark: #f1f5f9;
+            --gray: #94a3b8;
+            --card-bg: #0f172a;
+            --body-bg: #0a0f1c;
+            --border: #334155;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Cairo', 'Tajawal', sans-serif;
+            background-color: var(--body-bg);
+            color: var(--dark);
+            line-height: 1.6;
+            transition: var(--transition);
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Header */
+        header {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            padding: 1.5rem 0;
+            box-shadow: var(--shadow);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .logo i {
+            font-size: 2rem;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        /* Navigation */
+        nav {
+            background-color: var(--card-bg);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 0;
+            position: sticky;
+            top: 78px;
+            z-index: 99;
+        }
+
+        .nav-links {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .nav-link {
+            color: var(--dark);
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: var(--radius);
+            font-weight: 500;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        /* Main Content */
+        main {
+            padding: 2rem 0;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        /* Cards */
+        .card {
+            background-color: var(--card-bg);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            transition: var(--transition);
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-5px);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Exchange Rates */
+        .rates-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .rate-card {
+            background: linear-gradient(135deg, var(--card-bg), color-mix(in srgb, var(--primary) 10%, transparent));
+            border-radius: var(--radius);
+            padding: 1rem;
+            border: 1px solid var(--border);
+            transition: var(--transition);
+        }
+
+        .rate-card:hover {
+            transform: scale(1.03);
+        }
+
+        .currency-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .currency-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .currency-flag {
+            font-size: 1.5rem;
+        }
+
+        .currency-rate {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin: 0.5rem 0;
+        }
+
+        .currency-change {
+            font-size: 0.9rem;
+            padding: 4px 8px;
+            border-radius: 20px;
+            display: inline-block;
+            font-weight: 500;
+        }
+
+        .change-up {
+            background-color: rgba(22, 163, 74, 0.2);
+            color: var(--success);
+        }
+
+        .change-down {
+            background-color: rgba(220, 38, 38, 0.2);
+            color: var(--danger);
+        }
+
+        /* Converter */
+        .converter {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .converter-box {
+            background-color: color-mix(in srgb, var(--body-bg) 50%, transparent);
+            padding: 1.5rem;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+        }
+
+        .converter-amount {
+            width: 100%;
+            padding: 1rem;
+            font-size: 1.5rem;
+            text-align: center;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            background-color: var(--card-bg);
+            color: var(--dark);
+            font-weight: 600;
+        }
+
+        .converter-amount:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .converter-select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            background-color: var(--card-bg);
+            color: var(--dark);
+            font-weight: 500;
+            margin-top: 0.5rem;
+            cursor: pointer;
+        }
+
+        .swap-btn {
+            background-color: var(--secondary);
+            color: white;
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .swap-btn:hover {
+            transform: rotate(180deg);
+            background-color: #e68a00;
+        }
+
+        .converter-result {
+            text-align: center;
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-top: 1rem;
+            padding: 1rem;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border-radius: var(--radius);
+        }
+
+        /* Charts */
+        .chart-container {
+            height: 300px;
+            position: relative;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 5px;
+            background-color: color-mix(in srgb, var(--body-bg) 50%, transparent);
+            padding: 5px;
+            border-radius: var(--radius);
+            margin-bottom: 1rem;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 0.75rem;
+            text-align: center;
+            background: none;
+            border: none;
+            color: var(--dark);
+            font-weight: 500;
+            border-radius: calc(var(--radius) - 2px);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .tab:hover, .tab.active {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        /* Exchange Offices */
+        .exchange-offices {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .office-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            transition: var(--transition);
+        }
+
+        .office-card:hover {
+            border-color: var(--primary);
+            transform: translateX(5px);
+        }
+
+        .office-info h4 {
+            margin-bottom: 0.25rem;
+        }
+
+        .office-rating {
+            color: #fbbf24;
+            margin-top: 0.25rem;
+        }
+
+        .office-price {
+            text-align: right;
+        }
+
+        .buy-price, .sell-price {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        /* News */
+        .news-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+
+        .news-card {
+            border-radius: var(--radius);
+            overflow: hidden;
+            border: 1px solid var(--border);
+            transition: var(--transition);
+        }
+
+        .news-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .news-image {
+            height: 180px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 3rem;
+        }
+
+        .news-content {
+            padding: 1rem;
+            background-color: var(--card-bg);
+        }
+
+        .news-date {
+            font-size: 0.85rem;
+            color: var(--gray);
+            margin-bottom: 0.5rem;
+        }
+
+        .news-title {
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            line-height: 1.4;
+        }
+
+        .news-excerpt {
+            font-size: 0.95rem;
+            color: var(--gray);
+            margin-bottom: 1rem;
+        }
+
+        /* Calculator */
+        .calculator-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1rem;
+        }
+
+        .calc-card {
+            text-align: center;
+            padding: 1.5rem 1rem;
+            cursor: pointer;
+        }
+
+        .calc-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            color: var(--primary);
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: var(--radius);
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-dark);
+        }
+
+        .btn-secondary {
+            background-color: var(--secondary);
+            color: white;
+        }
+
+        .btn-outline {
+            background-color: transparent;
+            border: 2px solid var(--primary);
+            color: var(--primary);
+        }
+
+        .btn-outline:hover {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        /* Theme Toggle */
+        .theme-toggle {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.2rem;
+            cursor: pointer;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+
+        .theme-toggle:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Footer */
+        footer {
+            background-color: var(--dark);
+            color: white;
+            padding: 2rem 0;
+            margin-top: 3rem;
+        }
+
+        .footer-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 2rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .footer-link {
+            color: #cbd5e1;
+            text-decoration: none;
+            transition: var(--transition);
+        }
+
+        .footer-link:hover {
+            color: white;
+        }
+
+        .copyright {
+            text-align: center;
+            color: #94a3b8;
+            font-size: 0.9rem;
+            margin-top: 1rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .converter {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto auto auto;
+            }
+            
+            .swap-btn {
+                align-self: center;
+                justify-self: center;
+                transform: rotate(90deg);
+            }
+            
+            .header-content {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .nav-links {
+                gap: 10px;
+            }
+            
+            .nav-link {
+                padding: 6px 12px;
+                font-size: 0.9rem;
+            }
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease forwards;
+        }
+
+        /* Utilities */
+        .text-center { text-align: center; }
+        .mb-1 { margin-bottom: 0.5rem; }
+        .mb-2 { margin-bottom: 1rem; }
+        .mb-3 { margin-bottom: 1.5rem; }
+        .mt-1 { margin-top: 0.5rem; }
+        .mt-2 { margin-top: 1rem; }
+        .mt-3 { margin-top: 1.5rem; }
+        .d-none { display: none; }
+        .d-flex { display: flex; }
+        .justify-between { justify-content: space-between; }
+        .align-center { align-items: center; }
+        .gap-1 { gap: 0.5rem; }
+        .gap-2 { gap: 1rem; }
+        .w-100 { width: 100%; }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-chart-line"></i>
+                    <span>سوق الصرف السوري</span>
+                </div>
+                <div class="header-actions">
+                    <button class="theme-toggle" id="themeToggle">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                    <button class="btn btn-primary" onclick="refreshData()">
+                        <i class="fas fa-sync-alt"></i>
+                        تحديث الأسعار
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav>
+        <div class="container">
+            <div class="nav-links">
+                <a href="#rates" class="nav-link active">
+                    <i class="fas fa-coins"></i>
+                    أسعار العملات
+                </a>
+                <a href="#converter" class="nav-link">
+                    <i class="fas fa-exchange-alt"></i>
+                    محول العملات
+                </a>
+                <a href="#offices" class="nav-link">
+                    <i class="fas fa-money-check-alt"></i>
+                    أفضل الصرافين
+                </a>
+                <a href="#news" class="nav-link">
+                    <i class="far fa-newspaper"></i>
+                    أخبار السوق
+                </a>
+                <a href="#tools" class="nav-link">
+                    <i class="fas fa-calculator"></i>
+                    أدوات مالية
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container">
+        <!-- Real-time Rates -->
+        <section id="rates" class="mb-3">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <i class="fas fa-bolt"></i>
+                        أسعار الصرف اللحظية
+                    </h2>
+                    <div class="d-flex align-center gap-1">
+                        <span id="lastUpdate" class="text-muted">آخر تحديث: منذ دقيقة</span>
+                        <button class="btn btn-outline btn-sm" onclick="refreshData()">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="tabs mb-2">
+                    <button class="tab active" onclick="showRateTab('black')">السوق السوداء</button>
+                    <button class="tab" onclick="showRateTab('official')">الرسمي</button>
+                    <button class="tab" onclick="showRateTab('neighboring')">الدول المجاورة</button>
+                </div>
+                
+                <div class="rates-container" id="ratesContainer">
+                    <!-- يتم تعبئتها بالجافاسكريبت -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Converter & Chart -->
+        <div class="grid mb-3">
+            <!-- Converter -->
+            <div class="card" id="converter">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <i class="fas fa-exchange-alt"></i>
+                        محول العملات
+                    </h2>
+                </div>
+                
+                <div class="converter">
+                    <div class="converter-box">
+                        <input type="number" class="converter-amount" id="amount" value="1" min="0" step="0.01">
+                        <select class="converter-select" id="fromCurrency">
+                            <!-- يتم تعبئتها بالجافاسكريبت -->
+                        </select>
+                    </div>
+                    
+                    <button class="swap-btn" onclick="swapCurrencies()">
+                        <i class="fas fa-exchange-alt"></i>
+                    </button>
+                    
+                    <div class="converter-box">
+                        <div class="converter-result" id="result">0.00 ل.س</div>
+                        <select class="converter-select" id="toCurrency">
+                            <!-- يتم تعبئتها بالجافاسكريبت -->
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="mt-2">
+                    <div class="d-flex justify-between mb-1">
+                        <span>عمولة الصراف (2%):</span>
+                        <span id="commission">0.00</span>
+                    </div>
+                    <div class="d-flex justify-between mb-1">
+                        <span>المبلغ الصافي:</span>
+                        <span id="netAmount">0.00</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Chart -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <i class="fas fa-chart-line"></i>
+                        تطور سعر الدولار
+                    </h2>
+                    <select id="chartPeriod" class="converter-select" style="width: auto;" onchange="updateChart()">
+                        <option value="7">آخر 7 أيام</option>
+                        <option value="30">آخر 30 يوم</option>
+                        <option value="90">آخر 3 أشهر</option>
+                    </select>
+                </div>
+                
+                <div class="chart-container">
+                    <canvas id="usdChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Exchange Offices -->
+        <section id="offices" class="mb-3">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <i class="fas fa-money-check-alt"></i>
+                        أفضل الصرافين
+                    </h2>
+                    <button class="btn btn-outline" onclick="refreshOffices()">
+                        <i class="fas fa-map-marker-alt"></i>
+                        عرض في مدينتك
+                    </button>
+                </div>
+                
+                <div class="exchange-offices" id="officesList">
+                    <!-- يتم تعبئتها بالجافاسكريبت -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Financial Tools -->
+        <section id="tools" class="mb-3">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <i class="fas fa-calculator"></i>
+                        أدوات مالية مفيدة
+                    </h2>
+                </div>
+                
+                <div class="calculator-grid">
+                    <div class="card calc-card" onclick="openCalculator('inflation')">
+                        <div class="calc-icon">
+                            <i class="fas fa-chart-bar"></i>
+                        </div>
+                        <h3>حاسبة التضخم</h3>
+                        <p>احسب قيمة مدخراتك مع مرور الوقت</p>
+                    </div>
+                    
+                    <div class="card calc-card" onclick="openCalculator('salary')">
+                        <div class="calc-icon">
+                            <i class="fas fa-money-bill-wave"></i>
+                        </div>
+                        <h3>حاسبة الرواتب</h3>
+                        <p>قارن رواتبك بين العملات المختلفة</p>
+                    </div>
+                    
+                    <div class="card calc-card" onclick="openCalculator('remittance')">
+                        <div class="calc-icon">
+                            <i class="fas fa-hand-holding-usd"></i>
+                        </div>
+                        <h3>مقارنة الحوالات</h3>
+                        <p>أرخص طريقة لتحويل الأموال</p>
+                    </div>
+                    
+                    <div class="card calc-card" onclick="openCalculator('savings')">
+                        <div class="calc-icon">
+                            <i class="fas fa-piggy-bank"></i>
+                        </div>
+                        <h3>حاسبة التوفير</h3>
+                        <p>خطط لمدخراتك المستقبلية</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- News -->
+        <section id="news">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <i class="far fa-newspaper"></i>
+                        آخر أخبار السوق
+                    </h2>
+                    <button class="btn btn-outline" onclick="loadMoreNews()">
+                        <i class="fas fa-plus"></i>
+                        المزيد
+                    </button>
+                </div>
+                
+                <div class="news-grid" id="newsContainer">
+                    <!-- يتم تعبئتها بالجافاسكريبت -->
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="logo">
+                    <i class="fas fa-chart-line"></i>
+                    <span>سوق الصرف السوري</span>
+                </div>
+                
+                <div class="footer-links">
+                    <a href="#" class="footer-link">الأسئلة الشائعة</a>
+                    <a href="#" class="footer-link">اتصل بنا</a>
+                    <a href="#" class="footer-link">سياسة الخصوصية</a>
+                    <a href="#" class="footer-link">شروط الاستخدام</a>
+                </div>
+                
+                <div class="copyright">
+                    <p>الأسعار لأغراض إعلامية فقط. قد تختلف الأسعار الفعلية حسب السوق والصرف.</p>
+                    <p>© 2023 سوق الصرف السوري. جميع الحقوق محفوظة.</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script>
+        // بيانات التطبيق
+        const app = {
+            rates: {},
+            currencies: [
+                {code: 'USD', name: 'الدولار الأمريكي', flag: '🇺🇸', symbol: '$'},
+                {code: 'EUR', name: 'اليورو الأوروبي', flag: '🇪🇺', symbol: '€'},
+                {code: 'TRY', name: 'الليرة التركية', flag: '🇹🇷', symbol: '₺'},
+                {code: 'SAR', name: 'الريال السعودي', flag: '🇸🇦', symbol: 'ر.س'},
+                {code: 'JOD', name: 'الدينار الأردني', flag: '🇯🇴', symbol: 'د.أ'},
+                {code: 'AED', name: 'الدرهم الإماراتي', flag: '🇦🇪', symbol: 'د.إ'},
+                {code: 'IQD', name: 'الدينار العراقي', flag: '🇮🇶', symbol: 'د.ع'},
+                {code: 'LBP', name: 'الليرة اللبنانية', flag: '🇱🇧', symbol: 'ل.ل'},
+                {code: 'EGP', name: 'الجنيه المصري', flag: '🇪🇬', symbol: 'ج.م'},
+                {code: 'KWD', name: 'الدينار الكويتي', flag: '🇰🇼', symbol: 'د.ك'}
+            ],
+            cities: ['دمشق', 'حلب', 'حمص', 'اللاذقية', 'درعا', 'السويداء', 'دير الزور', 'الحسكة', 'طرطوس', 'الرقة'],
+            chartData: [],
+            darkMode: localStorage.getItem('darkMode') === 'true'
+        };
+
+        // تهيئة التطبيق
+        document.addEventListener('DOMContentLoaded', function() {
+            initTheme();
+            initCurrencies();
+            loadRates();
+            loadOffices();
+            loadNews();
+            initChart();
+            
+            // تحديث تلقائي كل دقيقة
+            setInterval(loadRates, 60000);
+            
+            // تحديث الوقت
+            setInterval(updateLastUpdate, 60000);
+            
+            // إضافة تأثيرات للكروت
+            animateCards();
         });
-    } else if (Notification.permission !== "denied") {
-        Notification.requestPermission();
-    }
-}
-</script>
 
+        // إدارة الوضع الداكن
+        function initTheme() {
+            const themeToggle = document.getElementById('themeToggle');
+            if (app.darkMode) {
+                document.body.setAttribute('data-theme', 'dark');
+                themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+            }
+            
+            themeToggle.addEventListener('click', function() {
+                app.darkMode = !app.darkMode;
+                localStorage.setItem('darkMode', app.darkMode);
+                
+                if (app.darkMode) {
+                    document.body.setAttribute('data-theme', 'dark');
+                    this.innerHTML = '<i class="fas fa-sun"></i>';
+                } else {
+                    document.body.removeAttribute('data-theme');
+                    this.innerHTML = '<i class="fas fa-moon"></i>';
+                }
+            });
+        }
+
+        // تهيئة قوائم العملات
+        function initCurrencies() {
+            const fromSelect = document.getElementById('fromCurrency');
+            const toSelect = document.getElementById('toCurrency');
+            
+            // إضافة الليرة السورية أولاً
+            const syrOption = document.createElement('option');
+            syrOption.value = 'SYP';
+            syrOption.textContent = '🇸🇾 الليرة السورية';
+            toSelect.appendChild(syrOption);
+            
+            // إضافة العملات الأخرى
+            app.currencies.forEach(currency => {
+                const option1 = document.createElement('option');
+                option1.value = currency.code;
+                option1.textContent = `${currency.flag} ${currency.name}`;
+                
+                const option2 = document.createElement('option');
+                option2.value = currency.code;
+                option2.textContent = `${currency.flag} ${currency.name}`;
+                
+                fromSelect.appendChild(option1);
+                toSelect.appendChild(option2);
+            });
+            
+            // تعيين القيم الافتراضية
+            fromSelect.value = 'USD';
+            toSelect.value = 'SYP';
+            
+            // تحديث التحويل عند التغيير
+            fromSelect.addEventListener('change', convertCurrency);
+            toSelect.addEventListener('change', convertCurrency);
+            document.getElementById('amount').addEventListener('input', convertCurrency);
+        }
+
+        // جلب أسعار العملات
+        async function loadRates() {
+            try {
+                // محاكاة API (في الواقع ستستخدم API حقيقي)
+                simulateRates();
+                
+                // عرض الأسعار
+                displayRates();
+                
+                // تحديث وقت التحديث
+                updateLastUpdate();
+                
+                // تحديث التحويل
+                convertCurrency();
+                
+            } catch (error) {
+                console.error('Error loading rates:', error);
+            }
+        }
+
+        // محاكاة أسعار العملات (للتجربة)
+        function simulateRates() {
+            const baseRates = {
+                'USD': { black: 10500, official: 4500, change: 1.2 },
+                'EUR': { black: 11200, official: 4800, change: -0.8 },
+                'TRY': { black: 340, official: 150, change: 0.5 },
+                'SAR': { black: 2800, official: 1200, change: 0.3 },
+                'JOD': { black: 14800, official: 6350, change: -0.2 },
+                'AED': { black: 2860, official: 1225, change: 0.4 },
+                'IQD': { black: 7.2, official: 3.1, change: 0.1 },
+                'LBP': { black: 0.065, official: 0.028, change: 0 },
+                'EGP': { black: 340, official: 145, change: 0.6 },
+                'KWD': { black: 34500, official: 14800, change: 0.2 }
+            };
+            
+            // إضافة تغييرات عشوائية صغيرة
+            app.currencies.forEach(currency => {
+                const code = currency.code;
+                if (baseRates[code]) {
+                    const change = (Math.random() - 0.5) * 2; // -1 إلى 1
+                    const newBlack = baseRates[code].black * (1 + change/100);
+                    const newOfficial = baseRates[code].official * (1 + change/100);
+                    
+                    app.rates[code] = {
+                        black: newBlack,
+                        official: newOfficial,
+                        change: change
+                    };
+                }
+            });
+            
+            // إضافة بيانات للرسم البياني
+            const today = new Date();
+            for (let i = 0; i < 90; i++) {
+                const date = new Date();
+                date.setDate(today.getDate() - (89 - i));
+                const value = 10000 + Math.random() * 1000 + i * 10;
+                app.chartData.push({
+                    date: date.toISOString().split('T')[0],
+                    value: value
+                });
+            }
+        }
+
+        // عرض أسعار العملات
+        function displayRates() {
+            const container = document.getElementById('ratesContainer');
+            container.innerHTML = '';
+            
+            const activeTab = document.querySelector('.tab.active').getAttribute('onclick').includes('black') ? 'black' : 
+                             document.querySelector('.tab.active').getAttribute('onclick').includes('official') ? 'official' : 'neighboring';
+            
+            let currenciesToShow = [...app.currencies];
+            
+            if (activeTab === 'neighboring') {
+                currenciesToShow = currenciesToShow.filter(c => ['TRY', 'JOD', 'LBP', 'IQD', 'EGP'].includes(c.code));
+            }
+            
+            currenciesToShow.forEach(currency => {
+                const rate = app.rates[currency.code];
+                if (!rate) return;
+                
+                const price = activeTab === 'official' ? rate.official : rate.black;
+                const change = rate.change;
+                
+                const rateCard = document.createElement('div');
+                rateCard.className = 'rate-card fade-in';
+                rateCard.innerHTML = `
+                    <div class="currency-info">
+                        <div class="currency-name">${currency.name}</div>
+                        <div class="currency-flag">${currency.flag}</div>
+                    </div>
+                    <div class="currency-rate">${price.toLocaleString('ar-SY')} ل.س</div>
+                    <div class="currency-change ${change >= 0 ? 'change-up' : 'change-down'}">
+                        <i class="fas fa-${change >= 0 ? 'caret-up' : 'caret-down'}"></i>
+                        ${Math.abs(change).toFixed(2)}%
+                    </div>
+                    <div class="mt-1 text-muted" style="font-size: 0.85rem;">
+                        ${activeTab === 'official' ? 'سعر رسمي' : 'سوق سوداء'}
+                    </div>
+                `;
+                
+                container.appendChild(rateCard);
+            });
+        }
+
+        // تبديل التبويبات
+        function showRateTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            displayRates();
+        }
+
+        // تحديث وقت التحديث الأخير
+        function updateLastUpdate() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('ar-SY', { hour: '2-digit', minute: '2-digit' });
+            document.getElementById('lastUpdate').textContent = `آخر تحديث: ${timeString}`;
+        }
+
+        // تحويل العملات
+        function convertCurrency() {
+            const amount = parseFloat(document.getElementById('amount').value) || 0;
+            const from = document.getElementById('fromCurrency').value;
+            const to = document.getElementById('toCurrency').value;
+            
+            if (!amount || !from || !to || !app.rates[from]) {
+                document.getElementById('result').textContent = '0.00 ل.س';
+                return;
+            }
+            
+            // أسعار السوق السوداء للتحويل
+            const fromRate = app.rates[from].black;
+            const toRate = app.rates[to] ? app.rates[to].black : 1; // إذا كانت SYP
+            
+            let result;
+            if (to === 'SYP') {
+                result = amount * fromRate;
+            } else if (from === 'SYP') {
+                result = amount / toRate;
+            } else {
+                result = (amount * fromRate) / toRate;
+            }
+            
+            // حساب العمولة (2%)
+            const commission = result * 0.02;
+            const netAmount = result - commission;
+            
+            // عرض النتائج
+            document.getElementById('result').textContent = `${result.toLocaleString('ar-SY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${to === 'SYP' ? 'ل.س' : to}`;
+            document.getElementById('commission').textContent = `${commission.toLocaleString('ar-SY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${to === 'SYP' ? 'ل.س' : to}`;
+            document.getElementById('netAmount').textContent = `${netAmount.toLocaleString('ar-SY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${to === 'SYP' ? 'ل.س' : to}`;
+        }
+
+        // تبديل العملات
+        function swapCurrencies() {
+            const fromSelect = document.getElementById('fromCurrency');
+            const toSelect = document.getElementById('toCurrency');
+            
+            const temp = fromSelect.value;
+            fromSelect.value = toSelect.value;
+            toSelect.value = temp;
+            
+            convertCurrency();
+        }
+
+        // تحميل الصرافين
+        function loadOffices() {
+            const offices = [
+                { name: 'صرافة الشام', city: 'دمشق', buy: 10450, sell: 10550, rating: 4.5, phone: '011-1234567' },
+                { name: 'صرافة حلب الدولية', city: 'حلب', buy: 10400, sell: 10520, rating: 4.3, phone: '021-7654321' },
+                { name: 'صرافة الفرات', city: 'دير الزور', buy: 10500, sell: 10600, rating: 4.2, phone: '051-9876543' },
+                { name: 'صرافة الساحل', city: 'اللاذقية', buy: 10480, sell: 10580, rating: 4.7, phone: '041-4567890' },
+                { name: 'صرافة الجنوب', city: 'درعا', buy: 10420, sell: 10530, rating: 4.0, phone: '015-3456789' }
+            ];
+            
+            const container = document.getElementById('officesList');
+            container.innerHTML = '';
+            
+            offices.forEach(office => {
+                const officeCard = document.createElement('div');
+                officeCard.className = 'office-card fade-in';
+                officeCard.innerHTML = `
+                    <div class="office-info">
+                        <h4>${office.name}</h4>
+                        <div class="text-muted">${office.city} | ${office.phone}</div>
+                        <div class="office-rating">
+                            ${'★'.repeat(Math.floor(office.rating))}${'☆'.repeat(5-Math.floor(office.rating))}
+                            <span style="color: var(--gray); margin-right: 5px;">(${office.rating})</span>
+                        </div>
+                    </div>
+                    <div class="office-price">
+                        <div class="buy-price" style="color: var(--success);">
+                            شراء: ${office.buy.toLocaleString('ar-SY')} ل.س
+                        </div>
+                        <div class="sell-price" style="color: var(--danger);">
+                            بيع: ${office.sell.toLocaleString('ar-SY')} ل.س
+                        </div>
+                        <div class="text-muted" style="font-size: 0.9rem;">
+                            فرق: ${(office.sell - office.buy).toLocaleString('ar-SY')} ل.س
+                        </div>
+                    </div>
+                `;
+                
+                container.appendChild(officeCard);
+            });
+        }
+
+        // تحميل الأخبار
+        function loadNews() {
+            const news = [
+                {
+                    title: 'الدولار يستقر حول 10,500 ليرة في السوق السوداء',
+                    excerpt: 'شهد سعر الدولار استقراراً نسبياً في الأسواق السورية خلال الأسبوع الماضي مع تحسن عمليات الاستيراد.',
+                    date: 'قبل 3 ساعات',
+                    category: 'السوق السوداء'
+                },
+                {
+                    title: 'المصرف المركزي يعلن عن تثبيت سعر الصرف الرسمي',
+                    excerpt: 'أعلن المصرف المركزي السوري تثبيت سعر صرف الليرة مقابل الدولار عند 4,500 ليرة للدولار الواحد.',
+                    date: 'أمس',
+                    category: 'أخبار رسمية'
+                },
+                {
+                    title: 'توقعات بارتفاع أسعار العملات مع اقتراب فصل الشتاء',
+                    excerpt: 'يتوقع خبراء اقتصاديون ارتفاعاً في أسعار العملات الأجنبية مع زيادة الطلب على الاستيراد لفصل الشتاء.',
+                    date: 'قبل يومين',
+                    category: 'تحليلات'
+                },
+                {
+                    title: 'تركيا تعلن عن تسهيلات جديدة للتبادل التجاري مع سوريا',
+                    excerpt: 'أعلنت الحكومة التركية عن حزمة تسهيلات جديدة للتبادل التجاري مع سوريا قد تؤثر على سعر الليرة التركية.',
+                    date: 'قبل 3 أيام',
+                    category: 'إقليمي'
+                }
+            ];
+            
+            const container = document.getElementById('newsContainer');
+            container.innerHTML = '';
+            
+            news.forEach(item => {
+                const newsCard = document.createElement('article');
+                newsCard.className = 'news-card fade-in';
+                newsCard.innerHTML = `
+                    <div class="news-image">
+                        <i class="far fa-newspaper"></i>
+                    </div>
+                    <div class="news-content">
+                        <div class="news-date">${item.date} | ${item.category}</div>
+                        <h3 class="news-title">${item.title}</h3>
+                        <p class="news-excerpt">${item.excerpt}</p>
+                        <button class="btn btn-outline w-100">قراءة المزيد</button>
+                    </div>
+                `;
+                
+                container.appendChild(newsCard);
+            });
+        }
+
+        // تهيئة الرسم البياني
+        function initChart() {
+            const ctx = document.getElementById('usdChart').getContext('2d');
+            
+            // إنشاء بيانات عشوائية للرسم البياني
+            const labels = [];
+            const data = [];
+            const today = new Date();
+            
+            for (let i = 29; i >= 0; i--) {
+                const date = new Date(today);
+                date.setDate(date.getDate() - i);
+                labels.push(date.toLocaleDateString('ar-SY', { month: 'short', day: 'numeric' }));
+                
+                // قيمة عشوائية مع اتجاه عام تصاعدي
+                const baseValue = 10000;
+                const randomFactor = Math.random() * 500 - 250;
+                const trend = i * 20;
+                data.push(baseValue + randomFactor + trend);
+            }
+            
+            window.usdChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'سعر الدولار (ل.س)',
+                        data: data,
+                        borderColor: 'rgba(37, 99, 235, 1)',
+                        backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            rtl: true,
+                            callbacks: {
+                                label: function(context) {
+                                    return `السعر: ${context.parsed.y.toLocaleString('ar-SY')} ل.س`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toLocaleString('ar-SY') + ' ل.س';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // تحديث الرسم البياني
+        function updateChart() {
+            const period = parseInt(document.getElementById('chartPeriod').value);
+            
+            // هنا يمكنك جلب بيانات جديدة حسب الفترة المحددة
+            // حالياً سنكتفي بإعادة رسم المخطط الحالي
+            if (window.usdChart) {
+                window.usdChart.destroy();
+                initChart();
+            }
+        }
+
+        // فتح الحاسبات
+        function openCalculator(type) {
+            let message = '';
+            
+            switch(type) {
+                case 'inflation':
+                    message = 'حاسبة التضخم: قم بإدخال مبلغك وعدد السنوات لحساب القيمة المستقبلية';
+                    break;
+                case 'salary':
+                    message = 'حاسبة الرواتب: قارن راتبك بين العملات المختلفة وأحسب القيمة الحقيقية';
+                    break;
+                case 'remittance':
+                    message = 'مقارنة الحوالات: اختر أرخص طريقة لتحويل أموالك إلى سوريا';
+                    break;
+                case 'savings':
+                    message = 'حاسبة التوفير: خطط لمستقبلك المالي وحدد أهداف التوفير';
+                    break;
+            }
+            
+            alert(`سيتم تطوير هذه الأداة قريباً!\n\n${message}`);
+        }
+
+        // تجديد البيانات
+        function refreshData() {
+            loadRates();
+            
+            // تأثير مرئي للتحديث
+            const refreshBtn = document.querySelector('.btn-primary');
+            refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري التحديث...';
+            refreshBtn.disabled = true;
+            
+            setTimeout(() => {
+                refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i> تحديث الأسعار';
+                refreshBtn.disabled = false;
+            }, 1500);
+        }
+
+        // تجديد قائمة الصرافين
+        function refreshOffices() {
+            loadOffices();
+            alert('جاري البحث عن أفضل الصرافين في مدينتك...');
+        }
+
+        // تحميل المزيد من الأخبار
+        function loadMoreNews() {
+            // في التطبيق الحقيقي، هذا سيجلب المزيد من المقالات
+            alert('جاري تحميل المزيد من الأخبار...');
+        }
+
+        // تأثيرات للكروت
+        function animateCards() {
+            const cards = document.querySelectorAll('.card');
+            
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('fade-in');
+                    }
+                });
+            }, { threshold: 0.1 });
+            
+            cards.forEach(card => observer.observe(card));
+        }
+
+        // التنقل بين الأقسام
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                // إزالة النشاط من جميع الروابط
+                document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                
+                // إضافة النشاط للرابط الحالي
+                this.classList.add('active');
+                
+                // التمرير للقسم المطلوب
+                const targetId = this.getAttribute('href').substring(1);
+                const targetElement = document.getElementById(targetId);
+                
+                if (targetElement) {
+                    window.scrollTo({
+                        top: targetElement.offsetTop - 100,
+                        behavior: 'smooth'
+                    });
+                }
+            });
+        });
+
+        // تهيئة التحويل
+        convertCurrency();
+    </script>
 </body>
-</html>
+    </html>
