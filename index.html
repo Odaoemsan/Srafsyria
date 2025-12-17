@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<title>سعر صرف الليرة السورية</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+:root {
+    --bg: #f2f4f7;
+    --card: #ffffff;
+    --text: #1f2933;
+    --green: #16a34a;
+    --red: #dc2626;
+}
+
+body.dark {
+    --bg: #0f172a;
+    --card: #1e293b;
+    --text: #e5e7eb;
+}
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    direction: rtl;
+    text-align: center;
+}
+
+header {
+    background: linear-gradient(135deg,#2563eb,#1e40af);
+    color: white;
+    padding: 20px;
+    font-size: 22px;
+}
+
+.container {
+    padding: 20px;
+}
+
+.controls {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+button {
+    border: none;
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.refresh {
+    background: #22c55e;
+    color: white;
+}
+
+.darkmode {
+    background: #334155;
+    color: white;
+}
+
+.card {
+    background: var(--card);
+    max-width: 380px;
+    margin: 15px auto;
+    padding: 20px;
+    border-radius: 16px;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+}
+
+.title {
+    font-size: 17px;
+    margin-bottom: 10px;
+}
+
+.price {
+    font-size: 26px;
+    font-weight: bold;
+}
+
+.up { color: var(--green); }
+.down { color: var(--red); }
+
+.update {
+    margin-top: 15px;
+    font-size: 13px;
+    opacity: 0.8;
+}
+
+footer {
+    font-size: 12px;
+    padding: 15px;
+    opacity: 0.7;
+}
+</style>
+</head>
+
+<body>
+
+<header>💱 سعر صرف الليرة السورية</header>
+
+<div class="container">
+
+<div class="controls">
+    <button class="refresh" onclick="fetchRates()">🔄 تحديث</button>
+    <button class="darkmode" onclick="toggleDark()">🌙 وضع ليلي</button>
+</div>
+
+<div class="card">
+    <div class="title">🇺🇸 الدولار → 🇸🇾 الليرة السورية</div>
+    <div class="price" id="usd_syp">جاري التحميل...</div>
+</div>
+
+<div class="card">
+    <div class="title">🇹🇷 الليرة التركية → 🇸🇾 الليرة السورية</div>
+    <div class="price" id="try_syp">جاري التحميل...</div>
+</div>
+
+<div class="update" id="last_update"></div>
+
+</div>
+
+<footer>
+الأسعار تقريبية – لأغراض معلوماتية فقط
+</footer>
+
+<script>
+let lastUsd = null;
+let lastTry = null;
+
+function toggleDark() {
+    document.body.classList.toggle("dark");
+    localStorage.setItem("darkmode", document.body.classList.contains("dark"));
+}
+
+if (localStorage.getItem("darkmode") === "true") {
+    document.body.classList.add("dark");
+}
+
+async function fetchRates() {
+    try {
+        const res = await fetch("https://open.er-api.com/v6/latest/USD");
+        const data = await res.json();
+
+        const usd = data.rates.SYP;
+        const tryRate = data.rates.TRY;
+        const trySyp = usd / tryRate;
+
+        setPrice("usd_syp", usd, lastUsd);
+        setPrice("try_syp", trySyp, lastTry);
+
+        lastUsd = usd;
+        lastTry = trySyp;
+
+        document.getElementById("last_update").innerText =
+            "⏱️ آخر تحديث: " + new Date().toLocaleTimeString();
+
+    } catch {
+        document.getElementById("usd_syp").innerText = "خطأ في جلب البيانات";
+        document.getElementById("try_syp").innerText = "خطأ في جلب البيانات";
+    }
+}
+
+function setPrice(id, value, last) {
+    const el = document.getElementById(id);
+    let cls = "";
+    let arrow = "";
+
+    if (last !== null) {
+        if (value > last) { cls = "up"; arrow = " ⬆️"; }
+        if (value < last) { cls = "down"; arrow = " ⬇️"; }
+    }
+
+    el.className = "price " + cls;
+    el.innerText = value.toLocaleString(undefined,{maximumFractionDigits:2}) + " ل.س" + arrow;
+}
+
+fetchRates();
+setInterval(fetchRates, 60000);
+</script>
+
+</body>
+</html>
