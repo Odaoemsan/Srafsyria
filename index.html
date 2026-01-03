@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>محول العملات السوري المحترف</title>
+    <title>محول العملات - عدي العثمان</title>
     <style>
         :root {
             --primary-gradient: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
@@ -11,6 +11,7 @@
             --bg-color: #f4f7f6;
             --card-bg: #ffffff;
             --text-color: #333;
+            --fb-color: #1877F2;
         }
 
         body {
@@ -21,6 +22,7 @@
             padding: 20px;
             display: flex;
             justify-content: center;
+            min-height: 100vh;
         }
 
         .container {
@@ -32,7 +34,6 @@
             box-shadow: 0 15px 35px rgba(0,0,0,0.1);
         }
 
-        /* رأس الصفحة مع زر تبديل اللغة */
         .header {
             display: flex;
             justify-content: space-between;
@@ -50,9 +51,8 @@
             font-size: 14px;
         }
 
-        h2 { text-align: center; color: #1e3c72; margin-top: 0; }
+        h2 { text-align: center; color: #1e3c72; margin-top: 0; font-size: 1.5rem; }
 
-        /* قسم إدخال الأسعار (Inputs) */
         .price-settings {
             background: #f9f9f9;
             padding: 15px;
@@ -61,16 +61,8 @@
             border: 1px solid #eee;
         }
 
-        .input-group {
-            margin-bottom: 15px;
-        }
-
-        .input-group label {
-            display: block;
-            font-weight: bold;
-            margin-bottom: 5px;
-            font-size: 14px;
-        }
+        .input-group { margin-bottom: 15px; }
+        .input-group label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 14px; }
 
         input, select {
             width: 100%;
@@ -84,18 +76,8 @@
 
         input:focus { border-color: #667eea; outline: none; }
 
-        /* قسم التحويل */
-        .converter-section {
-            border-top: 2px solid #eee;
-            padding-top: 20px;
-        }
-
-        .convert-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
+        .converter-section { border-top: 2px solid #eee; padding-top: 20px; }
+        .convert-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
 
         .btn-convert {
             width: 100%;
@@ -107,12 +89,11 @@
             font-size: 18px;
             font-weight: bold;
             cursor: pointer;
-            transition: transform 0.2s;
+            transition: 0.3s;
         }
 
-        .btn-convert:active { transform: scale(0.98); }
+        .btn-convert:hover { opacity: 0.9; }
 
-        /* مربع النتيجة */
         .result-box {
             margin-top: 20px;
             padding: 20px;
@@ -122,20 +103,41 @@
             border-radius: 15px;
             font-size: 22px;
             font-weight: bold;
-            box-shadow: 0 5px 15px rgba(118, 75, 162, 0.3);
-            display: none; /* يظهر فقط عند التحويل */
+            display: none;
         }
 
-        .fixed-note {
-            font-size: 12px;
-            color: #666;
-            font-style: italic;
+        /* تنسيق زر الفيسبوك في التوقيع */
+        .footer-credit {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 14px;
+            color: #777;
+            border-top: 1px solid #eee;
+            padding-top: 15px;
+        }
+
+        .fb-link {
+            display: inline-flex;
+            align-items: center;
+            color: var(--fb-color);
+            text-decoration: none;
+            font-weight: bold;
+            padding: 5px 10px;
+            border: 1px solid var(--fb-color);
+            border-radius: 8px;
+            transition: 0.3s;
+            margin-inline-start: 5px;
+        }
+
+        .fb-link:hover {
+            background-color: var(--fb-color);
+            color: white;
         }
     </style>
 </head>
 <body>
 
-<div class="container" id="app">
+<div class="container">
     <div class="header">
         <h2 id="title">محول العملات</h2>
         <button class="lang-toggle" onclick="toggleLanguage()">English</button>
@@ -144,11 +146,11 @@
     <div class="price-settings">
         <div class="input-group">
             <label id="lbl-tl">سعر الليرة التركية مقابل (القديمة):</label>
-            <input type="number" id="priceTL" placeholder="مثال: 450" oninput="updateValues()">
+            <input type="number" id="priceTL" placeholder="مثال: 450">
         </div>
         <div class="input-group">
             <label id="lbl-usd">سعر الدولار الأمريكي مقابل (القديمة):</label>
-            <input type="number" id="priceUSD" placeholder="مثال: 15000" oninput="updateValues()">
+            <input type="number" id="priceUSD" placeholder="مثال: 15000">
         </div>
         <div class="input-group">
             <label id="lbl-new">سعر الليرة الجديدة (ثابت):</label>
@@ -187,11 +189,15 @@
     </div>
 
     <div id="result" class="result-box"></div>
+
+    <div class="footer-credit" id="footer-text">
+        صمم بواسطة <a href="https://www.facebook.com/share/1AsGzPbpbG/" target="_blank" class="fb-link">عدي العثمان</a>
+    </div>
 </div>
 
 <script>
     let currentLang = 'ar';
-    const NEW_CURRENCY_FIXED = 100; // 1 ليرة جديدة = 100 ليرة قديمة
+    const NEW_VAL = 100;
 
     function toggleLanguage() {
         currentLang = currentLang === 'ar' ? 'en' : 'ar';
@@ -200,15 +206,19 @@
         document.documentElement.lang = isAr ? 'ar' : 'en';
         document.documentElement.dir = isAr ? 'rtl' : 'ltr';
         
-        // تحديث النصوص
         document.getElementById('title').innerText = isAr ? 'محول العملات' : 'Currency Converter';
-        document.getElementById('lbl-tl').innerText = isAr ? 'سعر الليرة التركية مقابل (القديمة):' : 'TRY Price vs (Old SYP):';
-        document.getElementById('lbl-usd').innerText = isAr ? 'سعر الدولار الأمريكي مقابل (القديمة):' : 'USD Price vs (Old SYP):';
-        document.getElementById('lbl-new').innerText = isAr ? 'سعر الليرة الجديدة (ثابت):' : 'New Lira Price (Fixed):';
+        document.getElementById('lbl-tl').innerText = isAr ? 'سعر الليرة التركية مقابل (القديمة):' : 'TRY Price (vs Old):';
+        document.getElementById('lbl-usd').innerText = isAr ? 'سعر الدولار الأمريكي مقابل (القديمة):' : 'USD Price (vs Old):';
+        document.getElementById('lbl-new').innerText = isAr ? 'سعر الليرة الجديدة (ثابت):' : 'New Lira (Fixed):';
         document.getElementById('lbl-amount').innerText = isAr ? 'المبلغ المراد تحويله:' : 'Amount to Convert:';
         document.getElementById('lbl-from').innerText = isAr ? 'من:' : 'From:';
         document.getElementById('lbl-to').innerText = isAr ? 'إلى:' : 'To:';
         document.getElementById('btn-text').innerText = isAr ? 'تحويـل الآن' : 'Convert Now';
+        
+        const designerName = isAr ? 'عدي العثمان' : 'Oday Al-Othman';
+        const designBy = isAr ? 'صمم بواسطة ' : 'Designed by ';
+        document.getElementById('footer-text').innerHTML = `${designBy} <a href="https://www.facebook.com/share/1AsGzPbpbG/" target="_blank" class="fb-link">${designerName}</a>`;
+        
         document.querySelector('.lang-toggle').innerText = isAr ? 'English' : 'العربية';
     }
 
@@ -216,37 +226,29 @@
         const amount = parseFloat(document.getElementById('amount').value);
         const from = document.getElementById('fromCurrency').value;
         const to = document.getElementById('toCurrency').value;
-        
-        const priceUSD = parseFloat(document.getElementById('priceUSD').value);
-        const priceTL = parseFloat(document.getElementById('priceTL').value);
+        const pUSD = parseFloat(document.getElementById('priceUSD').value);
+        const pTL = parseFloat(document.getElementById('priceTL').value);
 
-        if (isNaN(amount) || isNaN(priceUSD) || isNaN(priceTL)) {
-            alert(currentLang === 'ar' ? 'يرجى إدخال كافة الأسعار والمبلغ' : 'Please enter all prices and amount');
+        if (!amount || !pUSD || !pTL) {
+            alert(currentLang === 'ar' ? 'يرجى ملء كافة الحقول' : 'Please fill all fields');
             return;
         }
 
-        // تحويل كل شيء إلى "الليرة القديمة" كقاعدة بيانات أساسية
-        let amountInOldSYP;
-        
-        switch(from) {
-            case 'SYP': amountInOldSYP = amount; break;
-            case 'USD': amountInOldSYP = amount * priceUSD; break;
-            case 'TRY': amountInOldSYP = amount * priceTL; break;
-            case 'NEW': amountInOldSYP = amount * NEW_CURRENCY_FIXED; break;
-        }
+        let oldSYP;
+        if(from === 'SYP') oldSYP = amount;
+        else if(from === 'USD') oldSYP = amount * pUSD;
+        else if(from === 'TRY') oldSYP = amount * pTL;
+        else if(from === 'NEW') oldSYP = amount * NEW_VAL;
 
-        // التحويل من "الليرة القديمة" إلى العملة الهدف
-        let finalResult;
-        switch(to) {
-            case 'SYP': finalResult = amountInOldSYP; break;
-            case 'USD': finalResult = amountInOldSYP / priceUSD; break;
-            case 'TRY': finalResult = amountInOldSYP / priceTL; break;
-            case 'NEW': finalResult = amountInOldSYP / NEW_CURRENCY_FIXED; break;
-        }
+        let res;
+        if(to === 'SYP') res = oldSYP;
+        else if(to === 'USD') res = oldSYP / pUSD;
+        else if(to === 'TRY') res = oldSYP / pTL;
+        else if(to === 'NEW') res = oldSYP / NEW_VAL;
 
-        const resultDiv = document.getElementById('result');
-        resultDiv.style.display = 'block';
-        resultDiv.innerHTML = `${finalResult.toFixed(2)} <small>${to}</small>`;
+        const resDiv = document.getElementById('result');
+        resDiv.style.display = 'block';
+        resDiv.innerHTML = res.toLocaleString(undefined, {maximumFractionDigits: 2}) + " " + to;
     }
 </script>
 
